@@ -1,0 +1,76 @@
+---
+/** /{type}/{uid}/diff/{a}..{b}/: what changed in the source between two versions. */
+import type { GetStaticPaths } from 'astro';
+import { diffLines } from 'diff';
+import Base from '../../../../layouts/Base.astro';
+import { getSite, type EntryVersion } from '../../../../lib/content.ts';
+import { TYPES } from '../../../../lib/eid.ts';
+
+export const getStaticPaths = (async () => {
+  const site = await getSite();
+  return site.groups.flatMap((g) =>
+    g.versions.flatMap((a, i) =>
+      g.versions.slice(i + 1).map((b) => ({
+        params: { type: g.type, ref: g.uid, range: `${a.ver}..${b.ver}` },
+        props: { a, b },
+      })),
+    ),
+  );
+}) satisfies GetStaticPaths;
+
+const { a, b } = Astro.props as { a: EntryVersion; b: EntryVersion };
+const CONTEXT = 3;
+
+type Line = { kind: 'add' | 'del' | 'same' | 'gap'; text: string };
+const lines: Line[] = [];
+for (const part of diffLines(a.body.trim() + '\n', b.body.trim() + '\n')) {
+  const kind = part.added ? 'add' : part.removed ? 'del' : 'same';
+  for (const text of part.value.replace(/\n$/, '').split('\n')) lines.push({ kind, text });
+}
+// Keep a few lines of context around each change and fold the rest.
+const keep = lines.map((l) => l.kind !== 'same');
+lines.forEach((l, i) => {
+  if (l.kind === 'same') return;
+  for (let j = Math.max(0, i - CONTEXT); j <= Math.min(lines.length - 1, i + CONTEXT); j++) keep[j] = true;
+});
+const shown: Line[] = [];
+let skipped = 0;
+lines.forEach((l, i) => {
+  if (keep[i]) {
+    if (skipped) shown.push({ kind: 'gap', text: `${skipped} unchanged ${skipped === 1 ? 'line' : 'lines'}` });
+    skipped = 0;
+    shown.push(l);
+  } else skipped++;
+});
+if (skipped) shown.push({ kind: 'gap', text: `${skipped} unchanged ${skipped === 1 ? 'line' : 'lines'}` });
+
+const added = lines.filter((l) => l.kind === 'add').length;
+const removed = lines.filter((l) => l.kind === 'del').length;
+const between = a.group.versions.filter(
+  (v) => a.group.versions.indexOf(v) > a.group.versions.indexOf(a) && a.group.versions.indexOf(v) <= a.group.versions.indexOf(b),
+);
+---
+
+<Base title={`${b.title}: v${a.ver} to v${b.ver}`} noindex>
+  <p class="eyebrow">
+    <a href={`/${a.type}/`}>{TYPES[a.type].name}</a> ·
+    <a href={`/${a.type}/${a.uid}/`}>{a.type}/{a.uid}</a> · diff
+  </p>
+  <h1>{b.title}</h1>
+  <p class="muted">
+    From <a href={a.url}>v{a.ver}</a> to <a href={b.url}>v{b.ver}</a>:
+    {added} {added === 1 ? 'line' : 'lines'} added, {removed} removed, in the markdown source.
+  </p>
+  <ul>
+    {between.map((v) => v.changelog.map((c) => <li><span class="muted">v{v.ver}</span> {c}</li>))}
+  </ul>
+  {
+    added + removed === 0 ? (
+      <p class="note">The text is identical; only properties changed.</p>
+    ) : (
+      <div class="diff">
+        {shown.map((l) => <div class={l.kind}>{l.text}</div>)}
+      </div>
+    )
+  }
+</Base>

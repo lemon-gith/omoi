@@ -1,0 +1,146 @@
+---
+import 'katex/dist/katex.min.css';
+import { render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { getSite, type EntryVersion } from '../lib/content.ts';
+import { TYPES, floatPath, formatVersion, listPath, sameVersion } from '../lib/eid.ts';
+import { fmtDate, isoDate, tagPath } from '../lib/format.ts';
+import { bibtex } from '../lib/cite.ts';
+
+interface Props {
+  version: EntryVersion;
+}
+const { version: v } = Astro.props;
+const site = await getSite();
+const group = v.group;
+const isLatest = v === group.latest;
+const type = TYPES[v.type];
+const { Content } = await render(v.entry);
+
+const index = group.versions.indexOf(v);
+const previous = index > 0 ? group.versions[index - 1] : null;
+const backlinks = site.backlinks(group);
+const related = site.related(group);
+const family = site.family(group);
+const cite = bibtex(v);
+// "Share" gives a link that records this version but always lands on the newest one.
+const share = floatPath(v.type, v.uid, v.version, 0);
+---
+
+<Base title={v.title} description={v.summary}>
+  <article data-pagefind-body={isLatest ? '' : undefined}>
+    <header class="entry-head">
+      <p class="eyebrow">
+        <a href={`/${v.type}/`} data-pagefind-filter="type">{type.name}</a>
+        {v.kind && <span> · {v.kind === 'research' ? 'researched' : 'thoughts'}</span>}
+      </p>
+      <h1>{v.title}</h1>
+      {v.summary && <p class="summary">{v.summary}</p>}
+      <p class="entry-meta" data-pagefind-ignore>
+        <a class="eid" href={v.url}>{v.type}/{v.uid}<b>v{v.ver}</b></a>
+        <time datetime={isoDate(v.date)}>{fmtDate(isoDate(v.date))}</time>
+        {v.tags.map((t) => <a class="tag" href={tagPath(t)} data-pagefind-filter="tag">{t}</a>)}
+      </p>
+
+      {
+        !isLatest && (
+          <p class="note" data-pagefind-ignore>
+            You are reading version {v.ver}. The latest is{' '}
+            <a href={group.latest.url}>version {group.latest.ver}</a>, released{' '}
+            {fmtDate(isoDate(group.latest.date))}.
+          </p>
+        )
+      }
+
+      <div class="actions" data-pagefind-ignore>
+        <a class="btn" href={listPath(v.type, v.uid)}>
+          {group.versions.length === 1 ? '1 version' : `${group.versions.length} versions`}
+        </a>
+        {
+          previous && (
+            <a class="btn" href={`${listPath(v.type, v.uid)}diff/${previous.ver}..${v.ver}/`}>
+              Changes since v{previous.ver}
+            </a>
+          )
+        }
+        <a class="btn" href={share} data-copy-url title="A link that always opens the newest version">
+          Share
+        </a>
+        <details>
+          <summary class="btn">Cite</summary>
+          <div class="panel">
+            <pre><code id="bibtex">{cite}</code></pre>
+            <button class="btn" type="button" data-copy="#bibtex" hidden>Copy BibTeX</button>
+            <a class="btn" href={`${v.url}cite.bib`} download={`${v.type}-${v.eid}.bib`}>Download .bib</a>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <div class="prose" id="content">
+      <Content />
+    </div>
+  </article>
+
+  <footer class="entry-foot">
+    {
+      v.changelog.length > 0 && (
+        <>
+          <h2>Changed in v{v.ver}</h2>
+          <ul>{v.changelog.map((c) => <li>{c}</li>)}</ul>
+        </>
+      )
+    }
+    {
+      family.length > 0 && (
+        <>
+          <h2>Same idea, other stages</h2>
+          <ul>
+            {family.map((g) => (
+              <li>
+                <a href={g.latest.url}>{g.latest.title}</a>{' '}
+                <span class="muted">{TYPES[g.type].name}, v{g.latest.ver}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )
+    }
+    {
+      backlinks.length > 0 && (
+        <>
+          <h2>Linked from</h2>
+          <ul>
+            {backlinks.map((b) => (
+              <li>
+                <a href={b.from.url}>{b.from.title}</a>{' '}
+                <span class="muted">
+                  {b.from.type}/{b.from.eid}
+                  {b.to && !sameVersion(b.to, v.version) && `, citing v${formatVersion(b.to)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )
+    }
+    {
+      related.length > 0 && (
+        <>
+          <h2>Related</h2>
+          <ul>
+            {related.map((r) => (
+              <li>
+                <a href={r.url}>{r.title}</a> <span class="muted">{r.type}/{r.eid}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )
+    }
+  </footer>
+
+  <script>
+    import '../client/entry.ts';
+  </script>
+</Base>

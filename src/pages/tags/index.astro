@@ -1,0 +1,24 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getSite } from '../../lib/content.ts';
+import { tagPath } from '../../lib/format.ts';
+
+const site = await getSite();
+const tags = [...site.tags.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+---
+
+<Base title="Tags">
+  <h1>Tags</h1>
+  {tags.length === 0 && <p class="muted">No tags yet.</p>}
+  <ul class="types">
+    {
+      tags.map(([tag, entries]) => (
+        <li>
+          <a class="chip" href={tagPath(tag)}>
+            <code>#{tag}</code> {entries.length}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</Base>

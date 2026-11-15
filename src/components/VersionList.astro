@@ -1,0 +1,93 @@
+---
+import Base from '../layouts/Base.astro';
+import type { EntryGroup } from '../lib/content.ts';
+import { TYPES, changeLevel, latestPath } from '../lib/eid.ts';
+import { fmtDate, isoDate } from '../lib/format.ts';
+
+interface Props {
+  group: EntryGroup;
+}
+const { group } = Astro.props;
+const type = TYPES[group.type];
+const newestFirst = [...group.versions].reverse();
+const LEVEL = ['major', 'minor', 'patch'] as const;
+---
+
+<Base
+  title={`${group.latest.title}: versions`}
+  description={`Every version of ${type.name} ${group.uid}, with what changed in each.`}
+>
+  <p class="eyebrow"><a href={`/${group.type}/`}>{type.name}</a> · {group.type}/{group.uid}</p>
+  <h1>{group.latest.title}</h1>
+  <p class="muted">
+    {group.versions.length === 1 ? 'One version so far.' : `${group.versions.length} versions.`}{' '}
+    <a href={latestPath(group.type, group.uid)}>{group.type}/{group.uid}l</a> always opens the latest.
+  </p>
+
+  <ol class="versions" reversed>
+    {
+      newestFirst.map((v, i) => {
+        const prev = newestFirst[i + 1];
+        const level = prev ? changeLevel(prev.version, v.version) : null;
+        return (
+          <li>
+            <div class="head">
+              <a class="ver" href={v.url}>v{v.ver}</a>
+              <time datetime={isoDate(v.date)}>{fmtDate(isoDate(v.date))}</time>
+              {v === group.latest && <span class="badge latest">latest</span>}
+              {level !== null && <span class="badge">{LEVEL[level]}</span>}
+              {v.title !== group.latest.title && <span class="muted">“{v.title}”</span>}
+              {prev && <a href={`/${group.type}/${group.uid}/diff/${prev.ver}..${v.ver}/`}>diff from v{prev.ver}</a>}
+            </div>
+            {v.changelog.length > 0 ? (
+              <ul class="log">
+                {v.changelog.map((c) => (
+                  <li>{c}</li>
+                ))}
+              </ul>
+            ) : (
+              <p class="log muted" style="padding-left:0">First release.</p>
+            )}
+          </li>
+        );
+      })
+    }
+  </ol>
+
+  {
+    group.versions.length > 2 && (
+      <form class="filters" id="diff-form" hidden data-base={`/${group.type}/${group.uid}/diff/`}>
+        <label>
+          Compare{' '}
+          <select name="a">
+            {group.versions.slice(0, -1).map((v) => <option value={v.ver}>v{v.ver}</option>)}
+          </select>
+        </label>
+        <label>
+          with{' '}
+          <select name="b">
+            {newestFirst.slice(0, -1).map((v) => <option value={v.ver}>v{v.ver}</option>)}
+          </select>
+        </label>
+        <button class="btn">Show diff</button>
+      </form>
+    )
+  }
+
+  <script>
+    import { compareVersions, parseVersion } from '../lib/eid.ts';
+    const form = document.querySelector<HTMLFormElement>('#diff-form');
+    if (form) {
+      form.hidden = false;
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const data = new FormData(form);
+        const pair = [String(data.get('a')), String(data.get('b'))];
+        const order = compareVersions(parseVersion(pair[0])!, parseVersion(pair[1])!);
+        if (order === 0) return;
+        if (order > 0) pair.reverse();
+        location.href = `${form.dataset.base}${pair[0]}..${pair[1]}/`;
+      });
+    }
+  </script>
+</Base>

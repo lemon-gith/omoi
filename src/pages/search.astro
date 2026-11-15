@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import { TYPES, TYPE_IDS } from '../lib/eid.ts';
+---
+
+<Base title="Search" noindex>
+  <h1>Search</h1>
+  <form class="search-form" id="search" role="search" action="/search/">
+    <input type="search" name="q" placeholder="Search the full text of every entry" aria-label="Search" autofocus />
+    <select name="type" aria-label="Type" class="btn">
+      <option value="">Any type</option>
+      {TYPE_IDS.map((t) => <option value={TYPES[t].name}>{TYPES[t].plural}</option>)}
+    </select>
+    <button class="btn">Search</button>
+  </form>
+  <p class="muted" id="status" aria-live="polite"></p>
+  <ul class="rows" id="results"></ul>
+  <noscript>
+    <p class="note">
+      Full-text search runs in your browser and needs JavaScript. Without it, browse by
+      <a href="/">type</a> or by <a href="/tags/">tag</a>.
+    </p>
+  </noscript>
+
+  <script>
+    import '../client/search.ts';
+  </script>
+</Base>

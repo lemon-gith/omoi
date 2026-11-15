@@ -1,0 +1,18 @@
+---
+import { summarise, type EntryVersion } from '../lib/content.ts';
+import { renderRow } from '../lib/format.ts';
+
+interface Props {
+  entries: EntryVersion[];
+  id?: string;
+}
+const { entries, id } = Astro.props;
+---
+
+{
+  entries.length > 0 ? (
+    <ul class="rows" id={id} set:html={entries.map((e) => renderRow(summarise(e))).join('')} />
+  ) : (
+    <p class="muted" id={id}>Nothing here yet.</p>
+  )
+}

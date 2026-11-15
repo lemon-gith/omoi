@@ -1,0 +1,14 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Not found" noindex>
+  <h1>Nothing lives here.</h1>
+  <p id="hint">
+    That address does not match any entry. Try <a href="/">browsing</a> or <a href="/search/">searching</a>.
+  </p>
+
+  <script>
+    import '../client/resolve404.ts';
+  </script>
+</Base>

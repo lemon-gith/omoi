@@ -1,0 +1,50 @@
+---
+import Base from '../layouts/Base.astro';
+import Rows from '../components/Rows.astro';
+import { getSite } from '../lib/content.ts';
+import { TYPES, TYPE_IDS } from '../lib/eid.ts';
+import { SITE } from '../../site.config.ts';
+
+const site = await getSite();
+const counts = new Map(TYPE_IDS.map((t) => [t, site.latest.filter((v) => v.type === t).length]));
+const tags = [...site.tags.keys()].sort();
+---
+
+<Base>
+  <h1>{SITE.tagline}</h1>
+
+  <!-- Without JS: links to the per-type lists. With JS: toggles that filter the list below. -->
+  <ul class="types" id="types">
+    {
+      TYPE_IDS.map((t) => (
+        <li>
+          <a class="chip" href={`/${t}/`} data-type={t}>
+            <code>{t}</code> {TYPES[t].plural} <span class="muted">{counts.get(t)}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+  <form class="filters" id="filters" hidden role="search">
+    <input type="search" name="q" placeholder="Filter by title, summary or tag" aria-label="Filter entries" />
+    <select name="tag" aria-label="Tag">
+      <option value="">Any tag</option>
+      {tags.map((t) => <option value={t}>#{t}</option>)}
+    </select>
+    <select name="sort" aria-label="Sort">
+      <option value="new">Newest first</option>
+      <option value="old">Oldest first</option>
+      <option value="title">By title</option>
+    </select>
+  </form>
+
+  <p class="muted" id="count" aria-live="polite">
+    {site.latest.length > SITE.homeCount ? `Latest ${SITE.homeCount} of ${site.latest.length} entries.` : ''}
+  </p>
+  <Rows entries={site.latest.slice(0, SITE.homeCount)} id="list" />
+
+  <script>
+    import '../client/browse.ts';
+  </script>
+</Base>
