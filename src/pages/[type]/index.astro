@@ -1,0 +1,34 @@
+---
+/** /{type}/: every entry of one type. The full type name forwards to the short one. */
+import type { GetStaticPaths } from 'astro';
+import Base from '../../layouts/Base.astro';
+import Stub from '../../layouts/Stub.astro';
+import Rows from '../../components/Rows.astro';
+import { getSite } from '../../lib/content.ts';
+import { TYPES, TYPE_IDS, toTypeId } from '../../lib/eid.ts';
+
+export const getStaticPaths = (() =>
+  TYPE_IDS.flatMap((t) => [...new Set([t, TYPES[t].full])].map((type) => ({ params: { type } })))) satisfies GetStaticPaths;
+
+const type = toTypeId(Astro.params.type)!;
+const isAlias = Astro.params.type !== type;
+const site = await getSite();
+const entries = site.latest.filter((v) => v.type === type);
+const info = TYPES[type];
+---
+
+{
+  isAlias ? (
+    <Stub to={`/${type}/`} />
+  ) : (
+    <Base title={info.plural}>
+      <Fragment slot="head">
+        <link rel="alternate" type="application/atom+xml" title={`omoi ${info.plural}`} href={`/${type}/feed.xml`} />
+      </Fragment>
+      <p class="eyebrow">/{type}/ · /{info.full}/</p>
+      <h1>{info.plural}</h1>
+      <Rows entries={entries} />
+      <p class="muted"><a href={`/${type}/feed.xml`}>Atom feed for {info.plural.toLowerCase()}</a></p>
+    </Base>
+  )
+}

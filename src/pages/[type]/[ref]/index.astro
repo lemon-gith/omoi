@@ -1,0 +1,67 @@
+---
+/**
+ * Everything at /{type}/{ref}/:
+ *
+ *   /rfc/5v1.2/      the entry (canonical)
+ *   /rfc/5/          its version list
+ *   /rfc/5l/         stub -> latest version
+ *   /rfc/5v1+.2/     stubs -> the version each floating link resolves to
+ *   /post/...        the full type name: stubs -> the short-type URL
+ */
+import type { GetStaticPaths } from 'astro';
+import EntryPage from '../../../components/EntryPage.astro';
+import VersionList from '../../../components/VersionList.astro';
+import Stub from '../../../layouts/Stub.astro';
+import { getSite } from '../../../lib/content.ts';
+import {
+  TYPES,
+  entryPath,
+  formatFloat,
+  resolveFloat,
+  type Level,
+  type TypeId,
+} from '../../../lib/eid.ts';
+
+type Props =
+  | { kind: 'entry'; type: TypeId; uid: string; ver: string }
+  | { kind: 'list'; type: TypeId; uid: string }
+  | { kind: 'stub'; to: string };
+
+export const getStaticPaths = (async () => {
+  const site = await getSite();
+  const paths: { params: { type: string; ref: string }; props: Props }[] = [];
+  for (const g of site.groups) {
+    const { type, uid } = g;
+    const full = TYPES[type].full;
+    const all = g.versions.map((v) => v.version);
+    const add = (ref: string, props: Props) => {
+      paths.push({ params: { type, ref }, props });
+      // Under the full type name, everything forwards to the short-type URL.
+      if (full !== type) {
+        const to = props.kind === 'stub' ? props.to : `/${type}/${ref}/`;
+        paths.push({ params: { type: full, ref }, props: { kind: 'stub', to } });
+      }
+    };
+
+    add(uid, { kind: 'list', type, uid });
+    add(`${uid}l`, { kind: 'stub', to: g.latest.url });
+    for (const v of g.versions) {
+      add(v.eid, { kind: 'entry', type, uid, ver: v.ver });
+      for (const level of [0, 1, 2] as Level[]) {
+        const target = resolveFloat(all, v.version, level)!;
+        add(`${uid}v${formatFloat(v.version, level)}`, { kind: 'stub', to: entryPath(type, uid, target) });
+      }
+    }
+  }
+  return paths;
+}) satisfies GetStaticPaths;
+
+const props = Astro.props as Props;
+const site = await getSite();
+const group = props.kind === 'stub' ? undefined : site.group(props.type, props.uid);
+const version = props.kind === 'entry' ? group!.versions.find((v) => v.ver === props.ver) : undefined;
+---
+
+{props.kind === 'stub' && <Stub to={props.to} />}
+{props.kind === 'list' && <VersionList group={group!} />}
+{props.kind === 'entry' && <EntryPage version={version!} />}

@@ -1,0 +1,40 @@
+---
+/** Preview of an entry's unreleased draft.md. Only exists under `astro dev`. */
+import 'katex/dist/katex.min.css';
+import type { GetStaticPaths } from 'astro';
+import { getCollection, render } from 'astro:content';
+import Base from '../../../layouts/Base.astro';
+import { TYPES, type TypeId } from '../../../lib/eid.ts';
+
+export const getStaticPaths = (async () => {
+  if (!import.meta.env.DEV) return [];
+  const drafts = await getCollection('entries', (e) => e.id.endsWith('/draft'));
+  return drafts.map((entry) => {
+    const [type, uid] = entry.id.split('/');
+    return { params: { type, ref: uid }, props: { entry } };
+  });
+}) satisfies GetStaticPaths;
+
+const { entry } = Astro.props;
+const { type, ref: uid } = Astro.params;
+const { Content } = await render(entry);
+---
+
+<Base title={`Draft: ${entry.data.title}`} noindex>
+  <article>
+    <header class="entry-head">
+      <p class="eyebrow">{TYPES[type as TypeId].name} · {type}/{uid} · draft</p>
+      <h1>{entry.data.title}</h1>
+      {entry.data.summary && <p class="summary">{entry.data.summary}</p>}
+      <p class="note">
+        Unreleased draft, visible only in the dev server. Release it with
+        <code>npm run release -- {type}/{uid}</code>.
+      </p>
+    </header>
+    <div class="prose" id="content"><Content /></div>
+  </article>
+
+  <script>
+    import '../../../client/entry.ts';
+  </script>
+</Base>

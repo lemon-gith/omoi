@@ -1,0 +1,28 @@
+---
+/**
+ * Full links: /{type}/{eid}/{short-name}/ (and /{type}/{uid}l/{short-name}/).
+ * The short-name is decoration, so these are stubs to the canonical URL.
+ */
+import type { GetStaticPaths } from 'astro';
+import Stub from '../../../layouts/Stub.astro';
+import { getSite } from '../../../lib/content.ts';
+import { TYPES } from '../../../lib/eid.ts';
+
+export const getStaticPaths = (async () => {
+  const site = await getSite();
+  return site.groups.flatMap((g) =>
+    [...new Set([g.type, TYPES[g.type].full])].flatMap((type) => [
+      ...g.versions.map((v) => ({
+        params: { type, ref: v.eid, name: v.shortName },
+        props: { to: v.url },
+      })),
+      {
+        params: { type, ref: `${g.uid}l`, name: g.latest.shortName },
+        props: { to: g.latest.url },
+      },
+    ]),
+  );
+}) satisfies GetStaticPaths;
+---
+
+<Stub to={Astro.props.to} />

@@ -1,0 +1,20 @@
+---
+import type { GetStaticPaths } from 'astro';
+import Base from '../../layouts/Base.astro';
+import Rows from '../../components/Rows.astro';
+import { getSite } from '../../lib/content.ts';
+
+export const getStaticPaths = (async () => {
+  const site = await getSite();
+  return [...site.tags.keys()].map((tag) => ({ params: { tag } }));
+}) satisfies GetStaticPaths;
+
+const { tag } = Astro.params;
+const site = await getSite();
+---
+
+<Base title={`#${tag}`}>
+  <p class="eyebrow"><a href="/tags/">Tags</a></p>
+  <h1>#{tag}</h1>
+  <Rows entries={site.tags.get(tag) ?? []} />
+</Base>
